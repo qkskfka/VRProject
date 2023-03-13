@@ -198,4 +198,12 @@ public: // 잡기 버튼을 누르면 물체를 잡고 싶다.
 
 	UPROPERTY(EditDefaultsOnly, Category = "Haptic")
 	class UHapticFeedbackEffect_Curve* HF_Fire;
+
+protected: //widget 관련 속성
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category="Widget")
+	class UWidgetInteractionComponent* WidgetInteractionComp;
+	
+	// Release 상태로 되돌려놓기
+	void ReleaseUIInput();
+	
 };

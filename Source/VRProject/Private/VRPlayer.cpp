@@ -14,6 +14,8 @@
 #include "NiagaraDataInterfaceArrayFunctionLibrary.h"
 #include "Components/CapsuleComponent.h"
 #include <NiagaraComponent.h>
+#include <UMG/Public/Components/WidgetInteractionComponent.h>
+#include "Components/WidgetInteractionComponent.h"
 
 // Sets default values
 AVRPlayer::AVRPlayer()
@@ -66,6 +68,9 @@ AVRPlayer::AVRPlayer()
 	RightAim = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("RightAim"));
 	RightAim->SetupAttachment(RootComponent);
 	RightAim->SetTrackingMotionSource(FName("RightAim"));
+
+	WidgetInteractionComp = CreateDefaultSubobject<UWidgetInteractionComponent>(TEXT("WidgetInteractionComp"));
+	WidgetInteractionComp->SetupAttachment(RightAim);
 }
 
 // Called when the game starts or when spawned
@@ -167,6 +172,7 @@ void AVRPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 		InputSystem->BindAction(IA_Teleport, ETriggerEvent::Started, this, &AVRPlayer::TeleportStart);
 		InputSystem->BindAction(IA_Teleport, ETriggerEvent::Completed, this, &AVRPlayer::TeleportEnd);
 		InputSystem->BindAction(IA_Fire, ETriggerEvent::Started, this, &AVRPlayer::FireInput);
+		InputSystem->BindAction(IA_Fire, ETriggerEvent::Completed, this, &AVRPlayer::ReleaseUIInput);
 
 		//잡기
 		InputSystem->BindAction(IA_Grab, ETriggerEvent::Started, this, &AVRPlayer::TryGrab);
@@ -380,9 +386,21 @@ void AVRPlayer::DoWarp()
 	), 0.02f, true);
 	
 }
+void AVRPlayer::ReleaseUIInput()
+{
+	if (WidgetInteractionComp)
+	{
+		WidgetInteractionComp->ReleasePointerKey(EKeys::LeftMouseButton);
+	}
+}
 
 void AVRPlayer::FireInput(const FInputActionValue& Values)
 {
+	// UI에 이벤트 전달하고 싶다.
+	if (WidgetInteractionComp)
+	{
+		WidgetInteractionComp->PressPointerKey(EKeys::LeftMouseButton);
+	}
 	// 진동처리 하고 싶다.
 	auto PC = Cast<APlayerController>(GetController());
 	if (PC)
@@ -561,6 +579,8 @@ void AVRPlayer::Grabbing()
 	// 이전 회전값 업데이트
 	PrevRot = RightHand->GetComponentQuat();
 }
+
+
 
 
 
