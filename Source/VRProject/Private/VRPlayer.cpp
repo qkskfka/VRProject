@@ -88,6 +88,8 @@ void AVRPlayer::BeginPlay()
 		if (subSystem)
 		{
 			subSystem->AddMappingContext(IMC_VRInput, 0);
+			subSystem->AddMappingContext(IMC_Hand, 0);
+			
 		}
 	}
 
