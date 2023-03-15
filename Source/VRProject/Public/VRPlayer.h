@@ -199,6 +199,30 @@ public: // 잡기 버튼을 누르면 물체를 잡고 싶다.
 	UPROPERTY(EditDefaultsOnly, Category = "Haptic")
 	class UHapticFeedbackEffect_Curve* HF_Fire;
 
+	// 원격잡기 모드가 활성화 되면 원격잡기 모드 사용하도록 하고싶다.
+	// 필요속성 : 원격잡기 모드 여부, 거리 , 이동속도
+	UPROPERTY(EditDefaultsOnly, Category = "Grab")
+	bool IsRemoteGrab = true;
+	UPROPERTY(EditDefaultsOnly, Category = "Grab")
+	float RemoteDistance = 2000;
+	UPROPERTY(EditDefaultsOnly, Category = "Grab")
+	float RemoteMoveSpeed = 10;
+	// 검출범위
+	UPROPERTY(EditDefaultsOnly, Category = "Grab")
+	float RemoteRadius = 20;
+
+	// 원거리 물체를 위한 타이머
+	FTimerHandle GrabTimer;
+	
+	void RemoteGrab();
+
+	// RemoteGrab 시각화 처리할지 여부
+	UPROPERTY(EditDefaultsOnly, Category = "Grab")
+	bool bDrawDebugRemoteGrab = true;
+	//시각화 처리할 함수
+	void DrawDebugRemoteGrab();
+	
+	
 protected: //widget 관련 속성
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category="Widget")
 	class UWidgetInteractionComponent* WidgetInteractionComp;

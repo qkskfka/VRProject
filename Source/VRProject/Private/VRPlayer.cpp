@@ -158,6 +158,10 @@ void AVRPlayer::Tick(float DeltaTime)
 	DraweCrosshiar();
 
 	Grabbing();
+
+	DrawDebugRemoteGrab();
+
+	
 }
 
 // Called to bind functionality to input
@@ -388,6 +392,9 @@ void AVRPlayer::DoWarp()
 	), 0.02f, true);
 	
 }
+
+
+
 void AVRPlayer::ReleaseUIInput()
 {
 	if (WidgetInteractionComp)
@@ -468,6 +475,15 @@ void AVRPlayer::DraweCrosshiar()
 // 물체를 잡고 싶다.
 void AVRPlayer::TryGrab()
 {
+	//원거리 잡기 활성화 되어 있으면
+	if (IsRemoteGrab)
+	{
+		RemoteGrab();
+		// 아래는 처리하지 않는다.
+		return;
+	}
+	//아래는 처리하지 않는다.
+	
 	// 중심점
 	FVector Center = RightHand->GetComponentLocation();
 	// 충돌체크(구충돌)
@@ -477,7 +493,8 @@ void AVRPlayer::TryGrab()
 	Param.AddIgnoredActor(this);
 	Param.AddIgnoredComponent(RightHand);
 	TArray<FOverlapResult> HitObjs;
-	bool bHit = GetWorld()->OverlapMultiByChannel(HitObjs, Center, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(GrabRange), Param);
+	bool bHit = GetWorld()->OverlapMultiByChannel(HitObjs, Center, FQuat::Identity,
+		ECC_Visibility, FCollisionShape::MakeSphere(GrabRange), Param);
 
 	// 총돌하지 않았다면 아무처리 하지 않는다.
 	if (bHit == false)
@@ -522,8 +539,8 @@ void AVRPlayer::TryGrab()
 		
 		// -> 손에 붙여주자
 		GrabbedObject->AttachToComponent(RightHand, FAttachmentTransformRules::KeepWorldTransform);
-
 		PrePos = RightHand->GetComponentLocation();
+		PrevRot = RightHand->GetComponentQuat();
 	}
 	
 }
@@ -580,6 +597,98 @@ void AVRPlayer::Grabbing()
 	PrePos = RightHand->GetComponentLocation();
 	// 이전 회전값 업데이트
 	PrevRot = RightHand->GetComponentQuat();
+}
+
+//원격잡기 모드 사용하도록 하고싶다.
+void AVRPlayer::RemoteGrab()
+{
+	// 충돌체크(구충돌)
+	// 충돌한 물체들 기록할 배열
+	// 충돌 질의 작성
+	FCollisionQueryParams Param;
+	Param.AddIgnoredActor(this);
+	Param.AddIgnoredComponent(RightAim);
+	FVector StarPos = RightAim->GetComponentLocation();
+	FVector EndPos = StarPos + RightAim->GetForwardVector() * RemoteDistance;
+
+	FHitResult HitInfo;
+	bool bHit = GetWorld()->SweepSingleByChannel(HitInfo, StarPos, EndPos, FQuat::Identity,
+		ECC_Visibility, FCollisionShape::MakeSphere(RemoteRadius), Param);
+
+	//충돌이 되면 잡아당기기 애니메이션 실행
+	if (bHit && HitInfo.GetComponent()->IsSimulatingPhysics())
+	{
+		// 잡았다
+		IsGrabbed = true;
+		// 잡은 물체 할당
+		GrabbedObject = HitInfo.GetComponent();
+		// -> 물체 물리기능 비활성화
+		GrabbedObject->SetSimulatePhysics(false);
+		GrabbedObject->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		
+		// -> 손에 붙여주자
+		GrabbedObject->AttachToComponent(RightHand, FAttachmentTransformRules::KeepWorldTransform);
+		
+		
+		
+		// 원거리 물체가 손으로 끌려오도록 처리
+		GetWorld()->GetTimerManager().SetTimer(GrabTimer, FTimerDelegate::CreateLambda(
+		   [this]()->void
+		   {
+		   		// 이동 중간에 사용자가 놔버리면
+		   	if (GrabbedObject == nullptr)
+		   	{
+				  GetWorld()->GetTimerManager().ClearTimer(GrabTimer);
+				  return;
+			   }
+			   //  물체가 -> 손 위치로 도착
+			   FVector Pos = GrabbedObject->GetComponentLocation();
+			   FVector TargetPos = RightHand->GetComponentLocation();
+			   Pos = FMath::Lerp<FVector>(Pos, TargetPos, RemoteMoveSpeed * GetWorld()->DeltaTimeSeconds);
+		   		GrabbedObject->SetWorldLocation(Pos);
+		   	
+		   		float Distance = FVector::Dist(Pos, TargetPos);
+		   		// 거의 가까워 졌다면
+		   		if (Distance < 10)
+		   		{
+		   			// 이동 중단하기
+		   			GrabbedObject->SetWorldLocation(TargetPos);
+		   			
+		   			PrePos = RightHand->GetComponentLocation();
+					PrevRot = RightHand->GetComponentQuat();
+		   			
+		   			GetWorld()->GetTimerManager().ClearTimer(GrabTimer);
+		   		}
+		   }
+		), 0.02f, true);
+	}
+}
+
+void AVRPlayer::DrawDebugRemoteGrab()
+{
+	// 시각화 켜저있는지 여부확인, 원거리물체 잡기 활성화 여부
+	if (bDrawDebugRemoteGrab == false || IsRemoteGrab == false)
+	{
+		return;
+	}
+	FCollisionQueryParams Param;
+	Param.AddIgnoredActor(this);
+	Param.AddIgnoredComponent(RightAim);
+	FVector StarPos = RightAim->GetComponentLocation();
+	FVector EndPos = StarPos + RightAim->GetForwardVector() * RemoteDistance;
+
+	FHitResult HitInfo;
+	bool bHit = GetWorld()->SweepSingleByChannel(HitInfo, StarPos, EndPos,
+		FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(RemoteRadius), Param);
+
+	// 그리기
+	DrawDebugSphere(GetWorld(), StarPos, RemoteRadius, 10, FColor::Yellow);
+	if (bHit)
+	{
+		DrawDebugSphere(GetWorld(), HitInfo.Location, RemoteRadius, 10, FColor::Yellow);
+		
+	}
+	
 }
 
 
